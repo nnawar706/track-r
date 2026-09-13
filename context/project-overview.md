@@ -8,9 +8,9 @@ Track-r is a lightweight time-tracking and timesheet-submission tool for consult
 
 ## The Problem It Solves
 
-Consultants currently capture time badly: notes scattered across devices, a spreadsheet rebuilt from scratch every week, and hours reconstructed from memory on Friday afternoon. This causes two failures: time gets lost (forgotten entries never get logged at all) and time gets distorted (reconstructed-from-memory hours are inaccurate). Both directly cost the firm billable revenue.
+Consultants currently capture time badly: notes scattered across devices, a spreadsheet rebuilt from scratch every week, and hours reconstructed from memory on Friday afternoon. This causes two failures: time gets lost (forgotten entries never get logged at all) and time gets distorted (reconstructed-from-memory hours are inaccurate).
 
-Track-r addresses this with two things, and deliberately nothing more:
+Track-r addresses this with two things:
 - A way to log a time entry the moment work happens.
 - A weekly timesheet view that shows the week's entries and lets the consultant submit them.
 
@@ -116,6 +116,6 @@ Independent consultant or small firm employee who bills time to multiple clients
 3. Edit/delete entries while the timesheet is in draft
 4. Submit the timesheet and see its status changed
 5. Confirm the submitted week's entries are read-only
-6. Week boundary logic is correct (cannot select Saturdays and Sundays, week is from Monday to Friday).
+6. Week boundary logic is correct (cannot select Saturdays and Sundays, week is from Monday to Friday, a Sunday refers to that week's Monday not the following Monday).
 7. Attempting to submit a week with zero entries is rejected.
 8. Attempting to submit an already-submitted week is rejected.
