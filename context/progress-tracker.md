@@ -6,9 +6,9 @@ Update this file after every completed feature. Keep it short and readable. Any 
 
 ## Current Status
 
-**Phase:** Phase 4 — Projects Page
-**Last Completed:** 09 Timesheet Detail Modal Wiring
-**Next:** 10 Projects Page - Full UI
+**Phase:** Phase 5 — Tests
+**Last Completed:** 11 Projects Logic
+**Next:** 12 Backend Test Suite
 
 ---
 
@@ -34,8 +34,8 @@ Update this file after every completed feature. Keep it short and readable. Any 
 
 ### Phase 4 - Projects Page
 
-- [ ] 10 Projects Page - Full UI
-- [ ] 11 Projects Logic
+- [x] 10 Projects Page - Full UI
+- [x] 11 Projects Logic
 
 ### Phase 5 - Tests
 
@@ -84,3 +84,8 @@ Update this file after every completed feature. Keep it short and readable. Any 
 - Client: `api/timesheets.ts` gained `listTimesheets()`; `api/entries.ts` gained `updateEntry(id, input)` and `deleteEntry(id)`. The "which week does this entry belong to" problem (needed to know whether to refresh the current week's view, an open history-detail view, or both) is solved by deriving it client-side from the entry's own `date` via the already-existing `lib/week.ts`'s `getWeekStart` — no need to thread a separate week-context parameter through every callback.
 - `App.tsx` restructure: removed `MOCK_TIMESHEETS`/`MOCK_TIMESHEET_DETAILS` entirely. Added `timesheets`/`timesheetsLoading` (fetched on mount via `loadTimesheets`, refetched after any create/delete/submit since those can change a row's `entryCount` or `status`), and `selectedWeekStart`/`selectedDetail`/`selectedDetailLoading`/`selectedDetailError` (the "which history row is open" state, previously local to `Home.tsx` — moved up to `App.tsx` because opening a row now requires an API call, and `App.tsx` is where all data-fetching lives per the established pattern; `Home.tsx` went back to being purely presentational). `fetchSelectedDetail(weekStart)` is the shared refresh path used both when a row is first clicked and after an edit/delete lands in that same week. `handleSaveEntry`'s edit branch and a new shared `handleDeleteEntry` both call the real API then refresh whichever of {current week, open detail} the mutated entry's week matches (both, one, or neither) via `Promise.all`.
 - Verified against the real server + db via Playwright, covering the full matrix: history list shows a mix of a submitted week and a draft week with correct entry counts; clicking a submitted row shows a read-only detail (no Actions column); clicking a draft row shows Edit/Delete; Delete from within the detail modal actually removes the entry (confirmed via a re-fetched `entryCount: 0` and an empty-state render) and refreshes `Timesheet History`'s count; Edit from within the detail modal opens the shared `NewEntryModal` pre-filled with the date locked, and saving updates hours/billable-hours/"Last Updated" live in the still-open detail modal. First test pass had two false negatives from unscoped Playwright locators (`page.getByText('Actions')` matching the background page's own always-present Actions column instead of the dialog's; `page.getByText('Sep 7').first()` hitting the page's own "Week of Sep 7 – Sep 11" heading instead of the history row) — corrected by scoping to `page.getByRole('dialog')` and to the history table specifically; the underlying app behavior was correct throughout, only the test assertions were initially wrong. Dev db reset afterward; all project node processes killed and reconfirmed clean.
+- **Features 10 + 11 (Projects Page — Full UI + Logic) built together, wired straight to real data** rather than mock-first — by this point every other page already reads from the real API, and the mock-then-wire two-step from earlier features exists to let UI be verified visually before logic exists, which doesn't apply when the logic (list + create projects) is this small and the rest of the app's data layer is already live.
+- `projectModel.findAll()` now does the "per-project total billable hours aggregation" `GET /api/projects` needs (a `LEFT JOIN time_entry` + `COALESCE(SUM(CASE WHEN billable = 1 THEN hours END), 0)`, grouped by project) rather than adding a separate `totalHoursByProject` endpoint — `GET /api/projects` already had exactly one consumer shape to extend, and the extra field is harmless where it's currently ignored (Home's project count only reads `.length`). Added `projectModel.create({name, clientName})` and `projectController.createProject` (Zod: both fields required, trimmed, non-empty) mounted as `POST /api/projects` — a freshly created project always reports `totalBillableHours: 0` without a query, since it can't have entries yet. Per build-plan.md, no edit/delete project endpoints were built.
+- Client: `Project` type gained `totalBillableHours: number`. New `components/ProjectsTable.tsx` (name/client/billable-hours columns, `Skeleton` loading state, empty state — mirrors `TimesheetHistoryList`'s structure) and `components/AddProjectModal.tsx` (mirrors `NewEntryModal`'s async-save/inline-error/`isSaving` pattern exactly, just with two required text fields instead of the entry form). `pages/Projects.tsx` replaces its Feature-04 placeholder — receives `projects`/`projectsLoading`/`onCreateProject` as props (same App-owns-fetching pattern as `Home.tsx`), and owns only the modal's local open/closed state itself since that's page-local UI state nothing else needs.
+- `App.tsx`: the inert one-shot mount effect for projects became a proper `loadProjects` (`useCallback`), matching every other resource's load-function pattern; `handleCreateProject` calls `createProject` then `await loadProjects()` — refetch-as-source-of-truth, same as every other mutation in this app since Feature 06.
+- Verified via `tsc -b`, `npm run build`, and curl only (no Playwright this pass, per instruction): `GET /api/projects` returns the two seeded projects with `totalBillableHours: 0`; logging a 5h billable + 2h non-billable entry against project 1 makes its total read back as `5` (non-billable correctly excluded); `POST /api/projects` creates a project and returns it with `totalBillableHours: 0`; posting without `clientName` returns 400. Dev db reset afterward.

@@ -2,6 +2,7 @@ export type Project = {
   id: number
   name: string
   clientName: string
+  totalBillableHours: number
 }
 
 export type TimeEntry = {

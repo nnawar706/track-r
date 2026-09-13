@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table"
 import { StatusBadge } from "@/components/StatusBadge"
 import { formatWeekRange } from "@/lib/formatWeekRange"
+import { formatDateTime } from "@/lib/formatDateTime"
 import type { TimeEntry, TimesheetDetail } from "@/types"
 
 type TimesheetDetailModalProps = {
@@ -67,7 +68,9 @@ export function TimesheetDetailModal({
                 </div>
                 <div>
                   <p className="text-muted-foreground">Last Updated</p>
-                  <p className="font-medium text-foreground">{detail.updatedAt ?? "—"}</p>
+                  <p className="font-medium text-foreground">
+                    {detail.updatedAt ? formatDateTime(detail.updatedAt) : "—"}
+                  </p>
                 </div>
               </div>
 
