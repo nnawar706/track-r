@@ -131,7 +131,7 @@ Approved dependencies for this project:
 - react-router-dom
 - typescript
 - tailwindcss
-- shadcn/ui
+- shadcn/ui (CLI preset: `-b radix -p nova`) — brings in `radix-ui`, `cn`, `class-variance-authority`, `tw-animate-css`, and `shadcn` itself as a runtime import (`shadcn/tailwind.css` utilities)
 - lucide-react
 - sqlite
 - zod
