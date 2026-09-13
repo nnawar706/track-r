@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 import { addDays } from "@/lib/week"
 import type { TimeEntry, TimesheetStatus } from "@/types"
 
@@ -16,6 +17,7 @@ type EntryListProps = {
   weekStart: string
   status: TimesheetStatus
   entries: TimeEntry[]
+  isLoading: boolean
   onEdit: (entry: TimeEntry) => void
   onDelete: (entryId: number) => void
   onSubmit: () => void
@@ -28,7 +30,15 @@ function formatDayLabel(dateStr: string, weekdayIndex: number): string {
   return `${WEEKDAY_LABELS[weekdayIndex]}, ${month}/${day}`
 }
 
-export function EntryList({ weekStart, status, entries, onEdit, onDelete, onSubmit }: EntryListProps) {
+export function EntryList({
+  weekStart,
+  status,
+  entries,
+  isLoading,
+  onEdit,
+  onDelete,
+  onSubmit,
+}: EntryListProps) {
   const days = useMemo(
     () => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)),
     [weekStart]
@@ -45,7 +55,13 @@ export function EntryList({ weekStart, status, entries, onEdit, onDelete, onSubm
         <span className="text-sm text-muted-foreground">{weekTotalHours.toFixed(1)}h total</span>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        {isEmpty ? (
+        {isLoading ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border py-12 text-center">
             <p className="text-sm font-medium text-foreground">No entries yet this week</p>
             <p className="text-sm text-muted-foreground">Log your first entry to get started.</p>
@@ -109,7 +125,7 @@ export function EntryList({ weekStart, status, entries, onEdit, onDelete, onSubm
         )}
 
         <div className="flex justify-end border-t border-border pt-4">
-          <Button onClick={onSubmit} disabled={isSubmitted || isEmpty}>
+          <Button onClick={onSubmit} disabled={isSubmitted || isEmpty || isLoading}>
             {isSubmitted ? "Submitted" : "Submit Timesheet"}
           </Button>
         </div>

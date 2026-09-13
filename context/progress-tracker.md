@@ -7,8 +7,8 @@ Update this file after every completed feature. Keep it short and readable. Any 
 ## Current Status
 
 **Phase:** Phase 2 — Home Page
-**Last Completed:** 04 Home Page - Full UI
-**Next:** 05 New Entry Logic
+**Last Completed:** 05 New Entry Logic
+**Next:** 06 Home Data Wiring
 
 ---
 
@@ -23,7 +23,7 @@ Update this file after every completed feature. Keep it short and readable. Any 
 ### Phase 2 - Home Page
 
 - [x] 04 Home Page - Full UI
-- [ ] 05 New Entry Logic
+- [x] 05 New Entry Logic
 - [ ] 06 Home Data Wiring
 - [ ] 07 Submit Timesheet Logic
 
@@ -60,3 +60,11 @@ Update this file after every completed feature. Keep it short and readable. Any 
 - `NewEntryModal` does double duty as the edit form too (`editingEntry` prop): reused rather than building a second modal, since project-overview.md's rule "when editing an entry, user cannot edit the date" is the only real difference — the date input is just disabled and the "use last used project" checkbox is hidden in edit mode. Both create and edit currently mutate local mock state in `App.tsx`; real API wiring is Feature 05/06.
 - Mock "backend" state (projects, current-week entries, timesheet history + details) lives in `App.tsx` as the single lifted state owner, since the Navbar's "New Entry" button (global, per ui-context.md) and `Home.tsx`'s current-week view both need to share it. This will be replaced by real fetched state in Feature 06.
 - Verified via `tsc -b` (no errors), `npm run build` (succeeds), and a Playwright-driven screenshot pass against the Vite dev server: summary cards, day-grouped entry table with per-day/weekly totals, timesheet history list, the New Entry modal (including the weekend-date validation message firing correctly), and the Timesheet Detail modal all render as expected.
+- **Feature 05 (New Entry Logic) wires only entry *creation* to the API** — `POST /api/entries` — matching the build plan's scope exactly; edit/delete still mutate local mock state (no PUT/DELETE endpoints exist yet, those aren't assigned to a numbered feature until Phase 3's history wiring). Added `server/models/projectModel.js` (`findById` only — `findAll`/`create`/`totalHoursByProject` come with Feature 11), `server/models/timesheetModel.js` (`findByWeekStart`, `getOrCreate` — creates a `draft` row with computed `week_end` if none exists for that `week_start`), `server/models/timeEntryModel.js` (`create`, `findById`). All three import the `db` singleton default-exported from `db/connection.js` directly (no db-passing through function args, unlike `seed.js` which takes `db` as a param only to dodge a circular import at startup).
+- `server/controllers/timeEntryController.js` validates the request body with a Zod schema (`date` regex, `projectId` positive int, `hours` `0 < h < 20`, `billable` optional/defaults true, `note` nullable/optional) — installed `zod` on the server (already on code-standards.md's approved list, just not yet installed). Order of checks: validate shape → confirm `projectId` exists (400 if not) → resolve `week_start` from `date` via `lib/week.js` → `getOrCreate` the timesheet → 403 if that timesheet is already `submitted` → insert. A `UNIQUE(project_id, date)` violation is caught by its better-sqlite3 error code (`SQLITE_CONSTRAINT_UNIQUE`) and translated to a human-readable 409, per architecture.md's relationship-rules note. The success response includes the resolved `weekStart` (not in architecture.md's data flow diagram, but necessary plumbing so the client can tell whether the new entry belongs to the week currently on screen).
+- Mounted at `POST /api/entries` via new `server/routes/timeEntryRoutes.js`, wired into the existing `server/routes/index.js`.
+- Client: added `api/client.ts` (fetch wrapper — `ApiError` class carrying the HTTP status, reads `{ message }` off non-2xx JSON bodies, never surfaces raw errors) and `api/entries.ts` (`createEntry`). `client/.env.local` now holds `VITE_API_URL=http://localhost:5000/api` (server has `cors()` enabled already, so no dev proxy needed).
+- `NewEntryModal`'s `onSave` prop is now `Promise<void>`-returning; the modal awaits it, shows a `submitError` line inline on rejection (via `error instanceof ApiError ? error.message : ...` — the generic fallback is what code-standards.md's "never show raw error messages" resolves to for non-`ApiError` failures) and keeps the dialog open, or closes on success. A `Saving...` label + `isSaving` guard prevents double-submits.
+- `App.tsx`'s `handleSaveEntry`: the edit branch (`input.id !== undefined`) is untouched (still local-only); the create branch calls `api/entries.ts`'s `createEntry`, then compares the response's `weekStart` to the page's current `weekStart` — same week → append the server-returned entry (with its real DB id) into local `entries` state; different week → no append, instead sets a `toastMessage` ("Added to week of Aug 17 – Aug 21", via `formatWeekRange`). If `createEntry` throws, the error propagates up to the modal's catch block untouched (403 "You cannot add an entry to a submitted timesheet." surfaces inline, exactly as project-overview.md specifies).
+- Added `components/Toast.tsx` — deliberately **not** `position: fixed` (ui-context.md's Do Nots forbid it); it's an in-flow dismissible banner rendered between the `Navbar` and the routed page in `App.tsx`, auto-dismissing after 4s.
+- Verified end-to-end against the real server + a real (gitignored, local-only) SQLite db via Playwright driving the running Vite dev server: same-week entry appends into the visible list, different-week entry triggers the toast without appearing in the list, and manually flipping a timesheet to `submitted` and attempting an entry against it shows the inline 403 message and leaves the modal open. Also curl-verified: invalid hours (>20) → 400, missing `projectId` → 400, nonexistent `projectId` → 400, duplicate `(project_id, date)` → 409. Dev db was reset (deleted, regenerates from schema+seed) after manual testing so it doesn't carry test data forward.

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { isWeekend } from "@/lib/week"
+import { ApiError } from "@/api/client"
 import type { Project, TimeEntry } from "@/types"
 
 type NewEntryModalProps = {
@@ -35,7 +36,7 @@ type NewEntryModalProps = {
     hours: number
     billable: boolean
     note: string | null
-  }) => void
+  }) => Promise<void>
 }
 
 function todayDateOnly(): string {
@@ -62,9 +63,14 @@ export function NewEntryModal({
   const [hours, setHours] = useState("")
   const [billable, setBillable] = useState(true)
   const [note, setNote] = useState("")
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
+
+    setSubmitError(null)
+    setIsSaving(false)
 
     if (editingEntry) {
       setDate(editingEntry.date)
@@ -87,19 +93,27 @@ export function NewEntryModal({
   const dateIsWeekend = date !== "" && isWeekend(date)
   const parsedHours = Number(hours)
   const hoursValid = hours.trim() !== "" && parsedHours > 0 && parsedHours < 20
-  const canSave = date !== "" && projectId !== "" && hoursValid && !dateIsWeekend
+  const canSave = date !== "" && projectId !== "" && hoursValid && !dateIsWeekend && !isSaving
 
-  function handleSave() {
+  async function handleSave() {
     if (!canSave) return
-    onSave({
-      id: editingEntry?.id,
-      projectId: Number(projectId),
-      date,
-      hours: parsedHours,
-      billable,
-      note: note.trim() === "" ? null : note.trim(),
-    })
-    onOpenChange(false)
+    setSubmitError(null)
+    setIsSaving(true)
+    try {
+      await onSave({
+        id: editingEntry?.id,
+        projectId: Number(projectId),
+        date,
+        hours: parsedHours,
+        billable,
+        note: note.trim() === "" ? null : note.trim(),
+      })
+      onOpenChange(false)
+    } catch (error) {
+      setSubmitError(error instanceof ApiError ? error.message : "Something went wrong. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -196,12 +210,14 @@ export function NewEntryModal({
           </div>
         </div>
 
+        {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={!canSave}>
-            {editingEntry ? "Save Changes" : "Save Entry"}
+            {isSaving ? "Saving..." : editingEntry ? "Save Changes" : "Save Entry"}
           </Button>
         </DialogFooter>
       </DialogContent>

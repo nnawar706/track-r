@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { SummaryCards } from "@/components/SummaryCards"
 import { EntryList } from "@/components/EntryList"
 import { TimesheetHistoryList } from "@/components/TimesheetHistoryList"
@@ -8,10 +10,14 @@ import type { TimeEntry, Timesheet, TimesheetDetail, TimesheetStatus } from "@/t
 
 type HomeProps = {
   projectsCount: number
+  projectsLoading: boolean
   weekStart: string
   weekEnd: string
   status: TimesheetStatus
   entries: TimeEntry[]
+  entriesLoading: boolean
+  entriesError: string | null
+  onRetryEntries: () => void
   timesheets: Timesheet[]
   timesheetDetails: Record<number, TimesheetDetail>
   onEditEntry: (entry: TimeEntry) => void
@@ -21,10 +27,14 @@ type HomeProps = {
 
 export function Home({
   projectsCount,
+  projectsLoading,
   weekStart,
   weekEnd,
   status,
   entries,
+  entriesLoading,
+  entriesError,
+  onRetryEntries,
   timesheets,
   timesheetDetails,
   onEditEntry,
@@ -41,7 +51,7 @@ export function Home({
     selectedTimesheetId !== null ? (timesheetDetails[selectedTimesheetId] ?? null) : null
 
   return (
-    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 p-8">
+    <main className="mx-auto flex w-full max-w-360 flex-col gap-6 p-8">
       <h1 className="text-xl font-semibold text-foreground">
         Week of {formatWeekRange(weekStart, weekEnd)}
       </h1>
@@ -51,16 +61,29 @@ export function Home({
         entriesThisWeek={entries.length}
         weekStatus={status}
         billableHoursThisWeek={billableHours}
+        isLoading={projectsLoading || entriesLoading}
       />
 
-      <EntryList
-        weekStart={weekStart}
-        status={status}
-        entries={entries}
-        onEdit={onEditEntry}
-        onDelete={onDeleteEntry}
-        onSubmit={onSubmit}
-      />
+      {entriesError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-muted-foreground">{entriesError}</p>
+            <Button variant="outline" onClick={onRetryEntries}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <EntryList
+          weekStart={weekStart}
+          status={status}
+          entries={entries}
+          isLoading={entriesLoading}
+          onEdit={onEditEntry}
+          onDelete={onDeleteEntry}
+          onSubmit={onSubmit}
+        />
+      )}
 
       <TimesheetHistoryList
         timesheets={timesheets}

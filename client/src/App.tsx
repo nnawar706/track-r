@@ -1,59 +1,20 @@
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { Navbar } from "@/components/Navbar"
 import { NewEntryModal } from "@/components/NewEntryModal"
+import { Toast } from "@/components/Toast"
 import { Home } from "@/pages/Home"
 import { Projects } from "@/pages/Projects"
 import { addDays, getWeekEnd, getWeekStart } from "@/lib/week"
+import { formatWeekRange } from "@/lib/formatWeekRange"
+import { ApiError } from "@/api/client"
+import { createEntry } from "@/api/entries"
+import { listProjects } from "@/api/projects"
+import { getTimesheetByWeekStart } from "@/api/timesheets"
 import type { Project, TimeEntry, Timesheet, TimesheetDetail, TimesheetStatus } from "@/types"
-
-const MOCK_PROJECTS: Project[] = [
-  { id: 1, name: "Website Redesign", clientName: "Acme Corp" },
-  { id: 2, name: "Mobile App", clientName: "Globex Inc" },
-  { id: 3, name: "Data Migration", clientName: "Initech" },
-]
 
 const weekStart = getWeekStart(new Date())
 const weekEnd = getWeekEnd(weekStart)
-
-const INITIAL_ENTRIES: TimeEntry[] = [
-  {
-    id: 1,
-    projectId: 1,
-    projectName: "Website Redesign",
-    date: weekStart,
-    hours: 4,
-    billable: true,
-    note: "Homepage layout revisions",
-  },
-  {
-    id: 2,
-    projectId: 2,
-    projectName: "Mobile App",
-    date: weekStart,
-    hours: 2.5,
-    billable: true,
-    note: null,
-  },
-  {
-    id: 3,
-    projectId: 1,
-    projectName: "Website Redesign",
-    date: addDays(weekStart, 1),
-    hours: 6,
-    billable: true,
-    note: "Client review call + follow-up fixes",
-  },
-  {
-    id: 4,
-    projectId: 3,
-    projectName: "Data Migration",
-    date: addDays(weekStart, 2),
-    hours: 3,
-    billable: false,
-    note: "Internal cleanup script",
-  },
-]
 
 const previousWeekStart = addDays(weekStart, -7)
 const previousWeekEnd = getWeekEnd(previousWeekStart)
@@ -179,24 +140,71 @@ const MOCK_TIMESHEET_DETAILS: Record<number, TimesheetDetail> = {
 }
 
 export function App() {
-  const [entries, setEntries] = useState<TimeEntry[]>(INITIAL_ENTRIES)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(true)
+
+  const [entries, setEntries] = useState<TimeEntry[]>([])
   const [status, setStatus] = useState<TimesheetStatus>("draft")
-  const [lastUsedProjectId, setLastUsedProjectId] = useState<number | null>(1)
+  const [entriesLoading, setEntriesLoading] = useState(true)
+  const [entriesError, setEntriesError] = useState<string | null>(null)
+
+  const [lastUsedProjectId, setLastUsedProjectId] = useState<number | null>(null)
   const [newEntryOpen, setNewEntryOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  function handleSaveEntry(input: {
+  useEffect(() => {
+    let cancelled = false
+
+    listProjects()
+      .then((data) => {
+        if (!cancelled) setProjects(data)
+      })
+      .catch((error: unknown) => {
+        console.error("[App] failed to load projects", error)
+      })
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const loadWeekData = useCallback(async () => {
+    setEntriesLoading(true)
+    setEntriesError(null)
+    try {
+      const data = await getTimesheetByWeekStart(weekStart)
+      setEntries(data.entries)
+      setStatus(data.status)
+    } catch (error) {
+      console.error("[App] failed to load week data", error)
+      setEntriesError(
+        error instanceof ApiError ? error.message : "Unable to load this week's data. Please try again."
+      )
+    } finally {
+      setEntriesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadWeekData()
+  }, [loadWeekData])
+
+  async function handleSaveEntry(input: {
     id?: number
     projectId: number
     date: string
     hours: number
     billable: boolean
     note: string | null
-  }) {
-    const project = MOCK_PROJECTS.find((p) => p.id === input.projectId)
-    if (!project) return
-
+  }): Promise<void> {
     if (input.id !== undefined) {
+      const project = projects.find((p) => p.id === input.projectId)
+      if (!project) return
+
       setEntries((prev) =>
         prev.map((entry) =>
           entry.id === input.id
@@ -214,19 +222,22 @@ export function App() {
       return
     }
 
-    setEntries((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        projectId: input.projectId,
-        projectName: project.name,
-        date: input.date,
-        hours: input.hours,
-        billable: input.billable,
-        note: input.note,
-      },
-    ])
-    setLastUsedProjectId(input.projectId)
+    const created = await createEntry({
+      projectId: input.projectId,
+      date: input.date,
+      hours: input.hours,
+      billable: input.billable,
+      note: input.note,
+    })
+
+    setLastUsedProjectId(created.projectId)
+
+    if (created.weekStart === weekStart) {
+      await loadWeekData()
+      return
+    }
+
+    setToastMessage(`Added to week of ${formatWeekRange(created.weekStart, getWeekEnd(created.weekStart))}`)
   }
 
   function handleDeleteEntry(entryId: number) {
@@ -251,16 +262,21 @@ export function App() {
           setNewEntryOpen(true)
         }}
       />
+      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
       <Routes>
         <Route
           path="/"
           element={
             <Home
-              projectsCount={MOCK_PROJECTS.length}
+              projectsCount={projects.length}
+              projectsLoading={projectsLoading}
               weekStart={weekStart}
               weekEnd={weekEnd}
               status={status}
               entries={entries}
+              entriesLoading={entriesLoading}
+              entriesError={entriesError}
+              onRetryEntries={loadWeekData}
               timesheets={MOCK_TIMESHEETS}
               timesheetDetails={MOCK_TIMESHEET_DETAILS}
               onEditEntry={handleEditEntry}
@@ -277,7 +293,7 @@ export function App() {
           setNewEntryOpen(open)
           if (!open) setEditingEntry(null)
         }}
-        projects={MOCK_PROJECTS}
+        projects={projects}
         lastUsedProjectId={lastUsedProjectId}
         editingEntry={editingEntry}
         onSave={handleSaveEntry}
