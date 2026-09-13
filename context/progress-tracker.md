@@ -7,8 +7,8 @@ Update this file after every completed feature. Keep it short and readable. Any 
 ## Current Status
 
 **Phase:** Phase 2 — Home Page
-**Last Completed:** 03 Week/Date Library
-**Next:** 04 Home Page - Full UI
+**Last Completed:** 04 Home Page - Full UI
+**Next:** 05 New Entry Logic
 
 ---
 
@@ -22,7 +22,7 @@ Update this file after every completed feature. Keep it short and readable. Any 
 
 ### Phase 2 - Home Page
 
-- [ ] 04 Home Page - Full UI
+- [x] 04 Home Page - Full UI
 - [ ] 05 New Entry Logic
 - [ ] 06 Home Data Wiring
 - [ ] 07 Submit Timesheet Logic
@@ -54,3 +54,9 @@ Update this file after every completed feature. Keep it short and readable. Any 
 - `server/db/connection.js` reads `DB_PATH` from env with a default of `server/db/app.db`, and sets `PRAGMA foreign_keys = ON` on every connection.
 - `server/db/schema.sql` holds the three `CREATE TABLE IF NOT EXISTS` statements from architecture.md (the `IF NOT EXISTS` is an addition for idempotent startup, not a schema change). `connection.js` executes it and then calls `db/seed.js`'s `seed(db)` on every connection open — `seed()` no-ops once `project` has any rows, so it only inserts the 2 mock projects ("Website Redesign" / Acme Corp, "Mobile App" / Globex Inc) on a fresh database. Verified: schema creates all 3 tables, FK and UNIQUE(project_id, date) constraints reject bad inserts, and re-running doesn't duplicate the seed.
 - `server/lib/week.js` and `client/src/lib/week.ts` are independent, timezone-safe implementations (dates parsed/formatted via UTC getters/setters to avoid local-timezone day shifts) — both expose `getWeekStart`/`getWeekEnd`; the client also exports `isWeekend` for disabling Saturday/Sunday in the date picker. `getWeekStart` treats Sunday as belonging to the *preceding* Monday (not the next week) per project-overview.md's success criteria. Tests in `server/__tests__/week.test.js` (run via `npm test` → `node --test`, no extra test framework needed) cover the Monday–Friday case, Saturday/Sunday boundary, a year-boundary week, and `getWeekEnd` being exactly 4 days after `getWeekStart` — all 8 pass. The client version was verified against the same cases via `node --experimental-strip-types` and via `tsc -b` (strict mode, no errors).
+- **Feature 04 (Home Page — Full UI) built with mock data only, no API calls.** Added shadcn primitives via `npx shadcn@4.21.0 add card table dialog input label select badge skeleton checkbox switch textarea` (same Windows `./@/...` bug as before — moved generated files into `src/components/ui/` manually, no new npm dependencies pulled in since everything routes through the existing `radix-ui` meta-package). Installed `react-router-dom@7` (already an approved dependency, needed for project-overview.md's two routes) and added a minimal `pages/Projects.tsx` placeholder so the Navbar's Projects link resolves — the real Projects UI is still Feature 10, this placeholder is routing plumbing only.
+- New components: `components/Navbar.tsx` (not in architecture.md's original file list, but required by ui-context.md's global nav spec — Dashboard/Projects links + "New Entry" button), `components/StatusBadge.tsx` (small shared Draft/Submitted badge — Draft uses shadcn's `secondary` badge styling equivalent i.e. muted bg/foreground text, Submitted uses a custom `bg-primary/10 text-primary` combo since no built-in shadcn badge variant matches ui-context.md's "light blue tint" spec), plus the architecture-listed `SummaryCards`, `EntryList`, `NewEntryModal`, `TimesheetHistoryList`, `TimesheetDetailModal`.
+- `lib/week.ts` gained one addition: `addDays(date, days)`, reusing the file's existing private `parseDateOnly`/`formatDateOnly` helpers — needed by `EntryList` (grouping the week into Mon–Fri) and by `App.tsx`'s mock data generation. Existing Feature 03 functions/tests untouched. Added `lib/formatWeekRange.ts` (pure, no dependencies) shared by `TimesheetHistoryList`, `TimesheetDetailModal`, and `Home.tsx`'s heading.
+- `NewEntryModal` does double duty as the edit form too (`editingEntry` prop): reused rather than building a second modal, since project-overview.md's rule "when editing an entry, user cannot edit the date" is the only real difference — the date input is just disabled and the "use last used project" checkbox is hidden in edit mode. Both create and edit currently mutate local mock state in `App.tsx`; real API wiring is Feature 05/06.
+- Mock "backend" state (projects, current-week entries, timesheet history + details) lives in `App.tsx` as the single lifted state owner, since the Navbar's "New Entry" button (global, per ui-context.md) and `Home.tsx`'s current-week view both need to share it. This will be replaced by real fetched state in Feature 06.
+- Verified via `tsc -b` (no errors), `npm run build` (succeeds), and a Playwright-driven screenshot pass against the Vite dev server: summary cards, day-grouped entry table with per-day/weekly totals, timesheet history list, the New Entry modal (including the weekend-date validation message firing correctly), and the Timesheet Detail modal all render as expected.

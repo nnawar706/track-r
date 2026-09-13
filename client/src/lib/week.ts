@@ -31,3 +31,9 @@ export function isWeekend(date: Date | string): boolean {
   const dayOfWeek = parseDateOnly(date).getUTCDay()
   return dayOfWeek === 0 || dayOfWeek === 6
 }
+
+export function addDays(date: Date | string, days: number): string {
+  const d = parseDateOnly(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return formatDateOnly(d)
+}
