@@ -6,9 +6,9 @@ Update this file after every completed feature. Keep it short and readable. Any 
 
 ## Current Status
 
-**Phase:** Phase 1 — Foundation
-**Last Completed:** 02 Database Schema
-**Next:** 03 Week/Date Library
+**Phase:** Phase 2 — Home Page
+**Last Completed:** 03 Week/Date Library
+**Next:** 04 Home Page - Full UI
 
 ---
 
@@ -18,7 +18,7 @@ Update this file after every completed feature. Keep it short and readable. Any 
 
 - [x] 01 Boilerplate
 - [x] 02 Database Schema
-- [ ] 03 Week/Date Library
+- [x] 03 Week/Date Library
 
 ### Phase 2 - Home Page
 
@@ -53,3 +53,4 @@ Update this file after every completed feature. Keep it short and readable. Any 
 - Server's `dotenv.config()` now points at `.env.local` (was defaulting to `.env`) to match code-standards.md's env-var convention; `server/.env.local` holds `PORT`.
 - `server/db/connection.js` reads `DB_PATH` from env with a default of `server/db/app.db`, and sets `PRAGMA foreign_keys = ON` on every connection.
 - `server/db/schema.sql` holds the three `CREATE TABLE IF NOT EXISTS` statements from architecture.md (the `IF NOT EXISTS` is an addition for idempotent startup, not a schema change). `connection.js` executes it and then calls `db/seed.js`'s `seed(db)` on every connection open — `seed()` no-ops once `project` has any rows, so it only inserts the 2 mock projects ("Website Redesign" / Acme Corp, "Mobile App" / Globex Inc) on a fresh database. Verified: schema creates all 3 tables, FK and UNIQUE(project_id, date) constraints reject bad inserts, and re-running doesn't duplicate the seed.
+- `server/lib/week.js` and `client/src/lib/week.ts` are independent, timezone-safe implementations (dates parsed/formatted via UTC getters/setters to avoid local-timezone day shifts) — both expose `getWeekStart`/`getWeekEnd`; the client also exports `isWeekend` for disabling Saturday/Sunday in the date picker. `getWeekStart` treats Sunday as belonging to the *preceding* Monday (not the next week) per project-overview.md's success criteria. Tests in `server/__tests__/week.test.js` (run via `npm test` → `node --test`, no extra test framework needed) cover the Monday–Friday case, Saturday/Sunday boundary, a year-boundary week, and `getWeekEnd` being exactly 4 days after `getWeekStart` — all 8 pass. The client version was verified against the same cases via `node --experimental-strip-types` and via `tsc -b` (strict mode, no errors).
