@@ -40,7 +40,7 @@ export function Home({ projectsCount, projectsLoading, entryMutation, onEditEntr
   const [selectedDetailLoading, setSelectedDetailLoading] = useState(false)
   const [selectedDetailError, setSelectedDetailError] = useState<string | null>(null)
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submittingWeekStart, setSubmittingWeekStart] = useState<string | null>(null)
   const [isDeletingEntry, setIsDeletingEntry] = useState(false)
 
   const loadWeekData = useCallback(async () => {
@@ -160,18 +160,35 @@ export function Home({ projectsCount, projectsLoading, entryMutation, onEditEntr
     setIsDeletingEntry(false)
   }
 
-  async function handleSubmit() {
-    if (entries.length === 0 || status === "submitted" || isSubmitting) return
-    setIsSubmitting(true)
+  async function handleSubmitWeek(targetWeekStart: string) {
+    if (submittingWeekStart !== null) return
+    setSubmittingWeekStart(targetWeekStart)
     try {
-      await submitTimesheet(weekStart)
-      await Promise.all([loadWeekData(), loadTimesheets()])
+      await submitTimesheet(targetWeekStart)
+      const refreshes: Promise<unknown>[] = [loadTimesheets()]
+      if (targetWeekStart === weekStart) {
+        refreshes.push(loadWeekData())
+      }
+      if (selectedWeekStart && targetWeekStart === selectedWeekStart) {
+        refreshes.push(fetchSelectedDetail(selectedWeekStart))
+      }
+      await Promise.all(refreshes)
     } catch (error) {
       console.error("[Home] failed to submit timesheet", error)
       onError(error instanceof ApiError ? error.message : "Unable to submit timesheet. Please try again.")
     } finally {
-      setIsSubmitting(false)
+      setSubmittingWeekStart(null)
     }
+  }
+
+  function handleSubmit() {
+    if (entries.length === 0 || status === "submitted") return
+    handleSubmitWeek(weekStart)
+  }
+
+  function handleSubmitHistoryRow(timesheet: Timesheet) {
+    if (timesheet.status === "submitted" || timesheet.entryCount === 0) return
+    handleSubmitWeek(timesheet.weekStart)
   }
 
   const billableHours = entries
@@ -207,7 +224,7 @@ export function Home({ projectsCount, projectsLoading, entryMutation, onEditEntr
           status={status}
           entries={entries}
           isLoading={entriesLoading}
-          isSubmitting={isSubmitting}
+          isSubmitting={submittingWeekStart === weekStart}
           isDeleting={isDeletingEntry}
           onEdit={onEditEntry}
           onDelete={handleDeleteEntry}
@@ -218,7 +235,9 @@ export function Home({ projectsCount, projectsLoading, entryMutation, onEditEntr
       <TimesheetHistoryList
         timesheets={timesheets}
         isLoading={timesheetsLoading}
+        submittingWeekStart={submittingWeekStart}
         onRowClick={handleSelectTimesheet}
+        onSubmit={handleSubmitHistoryRow}
       />
 
       <TimesheetDetailModal

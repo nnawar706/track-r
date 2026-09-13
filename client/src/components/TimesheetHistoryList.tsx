@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -15,10 +16,18 @@ import type { Timesheet } from "@/types"
 type TimesheetHistoryListProps = {
   timesheets: Timesheet[]
   isLoading: boolean
+  submittingWeekStart: string | null
   onRowClick: (timesheet: Timesheet) => void
+  onSubmit: (timesheet: Timesheet) => void
 }
 
-export function TimesheetHistoryList({ timesheets, isLoading, onRowClick }: TimesheetHistoryListProps) {
+export function TimesheetHistoryList({
+  timesheets,
+  isLoading,
+  submittingWeekStart,
+  onRowClick,
+  onSubmit,
+}: TimesheetHistoryListProps) {
   return (
     <Card>
       <CardHeader>
@@ -40,22 +49,43 @@ export function TimesheetHistoryList({ timesheets, isLoading, onRowClick }: Time
                 <TableHead>Week</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Entries</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {timesheets.map((timesheet) => (
-                <TableRow
-                  key={timesheet.id}
-                  className="cursor-pointer"
-                  onClick={() => onRowClick(timesheet)}
-                >
-                  <TableCell>{formatWeekRange(timesheet.weekStart, timesheet.weekEnd)}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={timesheet.status} />
-                  </TableCell>
-                  <TableCell className="text-right">{timesheet.entryCount}</TableCell>
-                </TableRow>
-              ))}
+              {timesheets.map((timesheet) => {
+                const isDraft = timesheet.status !== "submitted"
+                const isSubmitting = submittingWeekStart === timesheet.weekStart
+
+                return (
+                  <TableRow
+                    key={timesheet.id}
+                    className="cursor-pointer"
+                    onClick={() => onRowClick(timesheet)}
+                  >
+                    <TableCell>{formatWeekRange(timesheet.weekStart, timesheet.weekEnd)}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={timesheet.status} />
+                    </TableCell>
+                    <TableCell className="text-right">{timesheet.entryCount}</TableCell>
+                    <TableCell className="text-right">
+                      {isDraft && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={timesheet.entryCount === 0 || submittingWeekStart !== null}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSubmit(timesheet)
+                          }}
+                        >
+                          {isSubmitting ? "Submitting..." : "Submit"}
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         )}
