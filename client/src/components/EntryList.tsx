@@ -19,8 +19,9 @@ type EntryListProps = {
   entries: TimeEntry[]
   isLoading: boolean
   isSubmitting: boolean
+  isDeleting: boolean
   onEdit: (entry: TimeEntry) => void
-  onDelete: (entryId: number) => void
+  onDelete: (entryId: number, entryDate: string) => void
   onSubmit: () => void
 }
 
@@ -37,6 +38,7 @@ export function EntryList({
   entries,
   isLoading,
   isSubmitting,
+  isDeleting,
   onEdit,
   onDelete,
   onSubmit,
@@ -111,8 +113,8 @@ export function EntryList({
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={isSubmitted}
-                            onClick={() => onDelete(entry.id)}
+                            disabled={isSubmitted || isDeleting}
+                            onClick={() => onDelete(entry.id, entry.date)}
                           >
                             Delete
                           </Button>

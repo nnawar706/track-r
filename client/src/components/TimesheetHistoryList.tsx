@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -13,17 +14,24 @@ import type { Timesheet } from "@/types"
 
 type TimesheetHistoryListProps = {
   timesheets: Timesheet[]
+  isLoading: boolean
   onRowClick: (timesheet: Timesheet) => void
 }
 
-export function TimesheetHistoryList({ timesheets, onRowClick }: TimesheetHistoryListProps) {
+export function TimesheetHistoryList({ timesheets, isLoading, onRowClick }: TimesheetHistoryListProps) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Timesheet History</CardTitle>
       </CardHeader>
       <CardContent>
-        {timesheets.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : timesheets.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No timesheets yet.</p>
         ) : (
           <Table>

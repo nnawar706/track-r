@@ -12,6 +12,18 @@ const createEntrySchema = z.object({
   note: z.string().trim().nullable().optional(),
 });
 
+const updateEntrySchema = z.object({
+  projectId: z.number().int().positive(),
+  hours: z.number().gt(0).lt(20),
+  billable: z.boolean().optional().default(true),
+  note: z.string().trim().nullable().optional(),
+});
+
+function parseEntryId(rawId) {
+  const id = Number(rawId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export function createEntry(req, res) {
   const parsed = createEntrySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -57,6 +69,80 @@ export function createEntry(req, res) {
       return res.status(409).json({ message: 'An entry for this project and date already exists.' });
     }
     console.error('[timeEntryController.createEntry]', error);
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+}
+
+export function updateEntry(req, res) {
+  const id = parseEntryId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ message: 'Invalid entry.' });
+  }
+
+  const parsed = updateEntrySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: 'Please check the entry details and try again.' });
+  }
+
+  const { projectId, hours, billable, note } = parsed.data;
+
+  try {
+    const existing = timeEntryModel.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Entry not found.' });
+    }
+
+    const timesheet = timesheetModel.findById(existing.timesheet_id);
+    if (timesheet.status === 'submitted') {
+      return res.status(403).json({ message: 'You cannot edit an entry on a submitted timesheet.' });
+    }
+
+    const project = projectModel.findById(projectId);
+    if (!project) {
+      return res.status(400).json({ message: 'Selected project does not exist.' });
+    }
+
+    const updated = timeEntryModel.update(id, { projectId, hours, billable, note: note ?? null });
+
+    return res.status(200).json({
+      id: updated.id,
+      projectId: updated.project_id,
+      projectName: project.name,
+      date: updated.date,
+      hours: updated.hours,
+      billable: Boolean(updated.billable),
+      note: updated.note,
+    });
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return res.status(409).json({ message: 'An entry for this project and date already exists.' });
+    }
+    console.error('[timeEntryController.updateEntry]', error);
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+}
+
+export function deleteEntry(req, res) {
+  const id = parseEntryId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ message: 'Invalid entry.' });
+  }
+
+  try {
+    const existing = timeEntryModel.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Entry not found.' });
+    }
+
+    const timesheet = timesheetModel.findById(existing.timesheet_id);
+    if (timesheet.status === 'submitted') {
+      return res.status(403).json({ message: 'You cannot delete an entry on a submitted timesheet.' });
+    }
+
+    timeEntryModel.remove(id);
+    return res.status(204).send();
+  } catch (error) {
+    console.error('[timeEntryController.deleteEntry]', error);
     return res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 }

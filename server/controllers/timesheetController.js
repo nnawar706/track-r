@@ -4,6 +4,24 @@ import { getWeekEnd } from '../lib/week.js';
 
 const WEEK_START_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+export function listTimesheets(req, res) {
+  try {
+    const timesheets = timesheetModel.findAll().map((row) => ({
+      id: row.id,
+      weekStart: row.week_start,
+      weekEnd: row.week_end,
+      status: row.status,
+      submittedAt: row.submitted_at,
+      entryCount: row.entry_count,
+    }));
+
+    return res.status(200).json(timesheets);
+  } catch (error) {
+    console.error('[timesheetController.listTimesheets]', error);
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+}
+
 export function getByWeekStart(req, res) {
   const { weekStart } = req.params;
 
@@ -22,6 +40,7 @@ export function getByWeekStart(req, res) {
         submittedAt: null,
         entries: [],
         billableHours: 0,
+        updatedAt: null,
       });
     }
 
@@ -45,6 +64,7 @@ export function getByWeekStart(req, res) {
         note: entry.note,
       })),
       billableHours,
+      updatedAt: timeEntryModel.findLastUpdatedAt(timesheet.id),
     });
   } catch (error) {
     console.error('[timesheetController.getByWeekStart]', error);

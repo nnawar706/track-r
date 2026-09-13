@@ -1,5 +1,5 @@
 import { apiRequest } from "@/api/client"
-import type { TimeEntry, TimesheetStatus } from "@/types"
+import type { TimeEntry, Timesheet, TimesheetStatus } from "@/types"
 
 export type WeekTimesheet = {
   weekStart: string
@@ -8,6 +8,11 @@ export type WeekTimesheet = {
   submittedAt: string | null
   entries: TimeEntry[]
   billableHours: number
+  updatedAt: string | null
+}
+
+export function listTimesheets(): Promise<Timesheet[]> {
+  return apiRequest<Timesheet[]>("/timesheets")
 }
 
 export function getTimesheetByWeekStart(weekStart: string): Promise<WeekTimesheet> {

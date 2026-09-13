@@ -43,5 +43,9 @@ export async function apiRequest<TResponse>(path: string, options?: RequestInit)
     throw new ApiError(response.status, message)
   }
 
+  if (response.status === 204) {
+    return undefined as TResponse
+  }
+
   return (await response.json()) as TResponse
 }

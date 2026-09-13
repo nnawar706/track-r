@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { SummaryCards } from "@/components/SummaryCards"
@@ -18,11 +17,18 @@ type HomeProps = {
   entriesLoading: boolean
   entriesError: string | null
   isSubmitting: boolean
+  isDeletingEntry: boolean
   onRetryEntries: () => void
   timesheets: Timesheet[]
-  timesheetDetails: Record<number, TimesheetDetail>
+  timesheetsLoading: boolean
+  selectedDetail: TimesheetDetail | null
+  selectedDetailOpen: boolean
+  selectedDetailLoading: boolean
+  selectedDetailError: string | null
+  onSelectTimesheet: (timesheet: Timesheet) => void
+  onCloseDetail: (open: boolean) => void
   onEditEntry: (entry: TimeEntry) => void
-  onDeleteEntry: (entryId: number) => void
+  onDeleteEntry: (entryId: number, entryDate: string) => void
   onSubmit: () => void
 }
 
@@ -36,21 +42,23 @@ export function Home({
   entriesLoading,
   entriesError,
   isSubmitting,
+  isDeletingEntry,
   onRetryEntries,
   timesheets,
-  timesheetDetails,
+  timesheetsLoading,
+  selectedDetail,
+  selectedDetailOpen,
+  selectedDetailLoading,
+  selectedDetailError,
+  onSelectTimesheet,
+  onCloseDetail,
   onEditEntry,
   onDeleteEntry,
   onSubmit,
 }: HomeProps) {
-  const [selectedTimesheetId, setSelectedTimesheetId] = useState<number | null>(null)
-
   const billableHours = entries
     .filter((entry) => entry.billable)
     .reduce((sum, entry) => sum + entry.hours, 0)
-
-  const selectedDetail =
-    selectedTimesheetId !== null ? (timesheetDetails[selectedTimesheetId] ?? null) : null
 
   return (
     <main className="mx-auto flex w-full max-w-360 flex-col gap-6 p-8">
@@ -82,6 +90,7 @@ export function Home({
           entries={entries}
           isLoading={entriesLoading}
           isSubmitting={isSubmitting}
+          isDeleting={isDeletingEntry}
           onEdit={onEditEntry}
           onDelete={onDeleteEntry}
           onSubmit={onSubmit}
@@ -90,15 +99,19 @@ export function Home({
 
       <TimesheetHistoryList
         timesheets={timesheets}
-        onRowClick={(timesheet) => setSelectedTimesheetId(timesheet.id)}
+        isLoading={timesheetsLoading}
+        onRowClick={onSelectTimesheet}
       />
 
       <TimesheetDetailModal
-        open={selectedTimesheetId !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedTimesheetId(null)
-        }}
+        open={selectedDetailOpen}
+        onOpenChange={onCloseDetail}
         detail={selectedDetail}
+        isLoading={selectedDetailLoading}
+        error={selectedDetailError}
+        isDeleting={isDeletingEntry}
+        onEdit={onEditEntry}
+        onDelete={onDeleteEntry}
       />
     </main>
   )

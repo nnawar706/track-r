@@ -17,6 +17,13 @@ export function findByTimesheet(timesheetId) {
     .all(timesheetId);
 }
 
+export function findLastUpdatedAt(timesheetId) {
+  const row = db
+    .prepare('SELECT MAX(updated_at) AS last_updated FROM time_entry WHERE timesheet_id = ?')
+    .get(timesheetId);
+  return row.last_updated;
+}
+
 export function create({ timesheetId, projectId, date, hours, billable, note }) {
   const { lastInsertRowid } = db
     .prepare(
@@ -26,4 +33,17 @@ export function create({ timesheetId, projectId, date, hours, billable, note }) 
     .run(timesheetId, projectId, date, hours, billable ? 1 : 0, note);
 
   return findById(lastInsertRowid);
+}
+
+export function update(id, { projectId, hours, billable, note }) {
+  db.prepare(
+    `UPDATE time_entry SET project_id = ?, hours = ?, billable = ?, note = ?, updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(projectId, hours, billable ? 1 : 0, note, id);
+
+  return findById(id);
+}
+
+export function remove(id) {
+  db.prepare('DELETE FROM time_entry WHERE id = ?').run(id);
 }

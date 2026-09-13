@@ -27,6 +27,6 @@ export type Timesheet = {
 
 export type TimesheetDetail = Timesheet & {
   totalBillableHours: number
-  updatedAt: string
+  updatedAt: string | null
   entries: TimeEntry[]
 }

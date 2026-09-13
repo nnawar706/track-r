@@ -5,139 +5,16 @@ import { NewEntryModal } from "@/components/NewEntryModal"
 import { Toast } from "@/components/Toast"
 import { Home } from "@/pages/Home"
 import { Projects } from "@/pages/Projects"
-import { addDays, getWeekEnd, getWeekStart } from "@/lib/week"
+import { getWeekEnd, getWeekStart } from "@/lib/week"
 import { formatWeekRange } from "@/lib/formatWeekRange"
 import { ApiError } from "@/api/client"
-import { createEntry } from "@/api/entries"
+import { createEntry, deleteEntry, updateEntry } from "@/api/entries"
 import { listProjects } from "@/api/projects"
-import { getTimesheetByWeekStart, submitTimesheet } from "@/api/timesheets"
+import { getTimesheetByWeekStart, listTimesheets, submitTimesheet } from "@/api/timesheets"
 import type { Project, TimeEntry, Timesheet, TimesheetDetail, TimesheetStatus } from "@/types"
 
 const weekStart = getWeekStart(new Date())
 const weekEnd = getWeekEnd(weekStart)
-
-const previousWeekStart = addDays(weekStart, -7)
-const previousWeekEnd = getWeekEnd(previousWeekStart)
-const twoWeeksAgoStart = addDays(weekStart, -14)
-const twoWeeksAgoEnd = getWeekEnd(twoWeeksAgoStart)
-
-const MOCK_TIMESHEETS: Timesheet[] = [
-  {
-    id: 101,
-    weekStart: previousWeekStart,
-    weekEnd: previousWeekEnd,
-    status: "submitted",
-    submittedAt: `${previousWeekEnd}T17:00:00Z`,
-    entryCount: 3,
-  },
-  {
-    id: 102,
-    weekStart: twoWeeksAgoStart,
-    weekEnd: twoWeeksAgoEnd,
-    status: "submitted",
-    submittedAt: `${twoWeeksAgoEnd}T16:30:00Z`,
-    entryCount: 5,
-  },
-]
-
-const MOCK_TIMESHEET_DETAILS: Record<number, TimesheetDetail> = {
-  101: {
-    id: 101,
-    weekStart: previousWeekStart,
-    weekEnd: previousWeekEnd,
-    status: "submitted",
-    submittedAt: `${previousWeekEnd}T17:00:00Z`,
-    entryCount: 3,
-    totalBillableHours: 12.5,
-    updatedAt: previousWeekEnd,
-    entries: [
-      {
-        id: 201,
-        projectId: 1,
-        projectName: "Website Redesign",
-        date: previousWeekStart,
-        hours: 5,
-        billable: true,
-        note: "Sprint planning + setup",
-      },
-      {
-        id: 202,
-        projectId: 2,
-        projectName: "Mobile App",
-        date: addDays(previousWeekStart, 1),
-        hours: 4,
-        billable: true,
-        note: null,
-      },
-      {
-        id: 203,
-        projectId: 1,
-        projectName: "Website Redesign",
-        date: addDays(previousWeekStart, 2),
-        hours: 3.5,
-        billable: true,
-        note: "QA pass",
-      },
-    ],
-  },
-  102: {
-    id: 102,
-    weekStart: twoWeeksAgoStart,
-    weekEnd: twoWeeksAgoEnd,
-    status: "submitted",
-    submittedAt: `${twoWeeksAgoEnd}T16:30:00Z`,
-    entryCount: 5,
-    totalBillableHours: 18,
-    updatedAt: twoWeeksAgoEnd,
-    entries: [
-      {
-        id: 204,
-        projectId: 3,
-        projectName: "Data Migration",
-        date: twoWeeksAgoStart,
-        hours: 4,
-        billable: true,
-        note: "Schema audit",
-      },
-      {
-        id: 205,
-        projectId: 1,
-        projectName: "Website Redesign",
-        date: addDays(twoWeeksAgoStart, 1),
-        hours: 4,
-        billable: true,
-        note: null,
-      },
-      {
-        id: 206,
-        projectId: 2,
-        projectName: "Mobile App",
-        date: addDays(twoWeeksAgoStart, 2),
-        hours: 5,
-        billable: true,
-        note: "Beta build fixes",
-      },
-      {
-        id: 207,
-        projectId: 2,
-        projectName: "Mobile App",
-        date: addDays(twoWeeksAgoStart, 3),
-        hours: 3,
-        billable: true,
-        note: null,
-      },
-      {
-        id: 208,
-        projectId: 3,
-        projectName: "Data Migration",
-        date: addDays(twoWeeksAgoStart, 4),
-        hours: 2,
-        billable: false,
-        note: "Cleanup",
-      },
-    ],
-  },
-}
 
 export function App() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -148,11 +25,20 @@ export function App() {
   const [entriesLoading, setEntriesLoading] = useState(true)
   const [entriesError, setEntriesError] = useState<string | null>(null)
 
+  const [timesheets, setTimesheets] = useState<Timesheet[]>([])
+  const [timesheetsLoading, setTimesheetsLoading] = useState(true)
+
+  const [selectedWeekStart, setSelectedWeekStart] = useState<string | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<TimesheetDetail | null>(null)
+  const [selectedDetailLoading, setSelectedDetailLoading] = useState(false)
+  const [selectedDetailError, setSelectedDetailError] = useState<string | null>(null)
+
   const [lastUsedProjectId, setLastUsedProjectId] = useState<number | null>(null)
   const [newEntryOpen, setNewEntryOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
   const [toast, setToast] = useState<{ message: string; variant: "info" | "error" } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -194,6 +80,64 @@ export function App() {
     loadWeekData()
   }, [loadWeekData])
 
+  const loadTimesheets = useCallback(async () => {
+    try {
+      const data = await listTimesheets()
+      setTimesheets(data)
+    } catch (error) {
+      console.error("[App] failed to load timesheet history", error)
+    } finally {
+      setTimesheetsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadTimesheets()
+  }, [loadTimesheets])
+
+  const fetchSelectedDetail = useCallback(
+    async (targetWeekStart: string) => {
+      setSelectedDetailLoading(true)
+      setSelectedDetailError(null)
+      try {
+        const data = await getTimesheetByWeekStart(targetWeekStart)
+        const row = timesheets.find((t) => t.weekStart === targetWeekStart)
+        setSelectedDetail({
+          id: row?.id ?? 0,
+          weekStart: data.weekStart,
+          weekEnd: data.weekEnd,
+          status: data.status,
+          submittedAt: data.submittedAt,
+          entryCount: data.entries.length,
+          totalBillableHours: data.billableHours,
+          updatedAt: data.updatedAt,
+          entries: data.entries,
+        })
+      } catch (error) {
+        console.error("[App] failed to load timesheet detail", error)
+        setSelectedDetailError(
+          error instanceof ApiError ? error.message : "Unable to load this timesheet. Please try again."
+        )
+      } finally {
+        setSelectedDetailLoading(false)
+      }
+    },
+    [timesheets]
+  )
+
+  function handleSelectTimesheet(timesheet: Timesheet) {
+    setSelectedWeekStart(timesheet.weekStart)
+    setSelectedDetail(null)
+    fetchSelectedDetail(timesheet.weekStart)
+  }
+
+  function handleCloseDetail(open: boolean) {
+    if (open) return
+    setSelectedWeekStart(null)
+    setSelectedDetail(null)
+    setSelectedDetailError(null)
+  }
+
   async function handleSaveEntry(input: {
     id?: number
     projectId: number
@@ -203,23 +147,20 @@ export function App() {
     note: string | null
   }): Promise<void> {
     if (input.id !== undefined) {
-      const project = projects.find((p) => p.id === input.projectId)
-      if (!project) return
+      await updateEntry(input.id, {
+        projectId: input.projectId,
+        hours: input.hours,
+        billable: input.billable,
+        note: input.note,
+      })
 
-      setEntries((prev) =>
-        prev.map((entry) =>
-          entry.id === input.id
-            ? {
-                ...entry,
-                projectId: input.projectId,
-                projectName: project.name,
-                hours: input.hours,
-                billable: input.billable,
-                note: input.note,
-              }
-            : entry
-        )
-      )
+      const entryWeekStart = getWeekStart(input.date)
+      if (entryWeekStart === weekStart) {
+        await loadWeekData()
+      }
+      if (selectedWeekStart && entryWeekStart === selectedWeekStart) {
+        await fetchSelectedDetail(selectedWeekStart)
+      }
       return
     }
 
@@ -232,6 +173,7 @@ export function App() {
     })
 
     setLastUsedProjectId(created.projectId)
+    await loadTimesheets()
 
     if (created.weekStart === weekStart) {
       await loadWeekData()
@@ -244,8 +186,30 @@ export function App() {
     })
   }
 
-  function handleDeleteEntry(entryId: number) {
-    setEntries((prev) => prev.filter((entry) => entry.id !== entryId))
+  async function handleDeleteEntry(entryId: number, entryDate: string) {
+    setIsDeletingEntry(true)
+    try {
+      await deleteEntry(entryId)
+    } catch (error) {
+      console.error("[App] failed to delete entry", error)
+      setToast({
+        message: error instanceof ApiError ? error.message : "Unable to delete entry. Please try again.",
+        variant: "error",
+      })
+      setIsDeletingEntry(false)
+      return
+    }
+
+    const entryWeekStart = getWeekStart(entryDate)
+    const refreshes: Promise<unknown>[] = [loadTimesheets()]
+    if (entryWeekStart === weekStart) {
+      refreshes.push(loadWeekData())
+    }
+    if (selectedWeekStart && entryWeekStart === selectedWeekStart) {
+      refreshes.push(fetchSelectedDetail(selectedWeekStart))
+    }
+    await Promise.all(refreshes)
+    setIsDeletingEntry(false)
   }
 
   function handleEditEntry(entry: TimeEntry) {
@@ -258,7 +222,7 @@ export function App() {
     setIsSubmitting(true)
     try {
       await submitTimesheet(weekStart)
-      await loadWeekData()
+      await Promise.all([loadWeekData(), loadTimesheets()])
     } catch (error) {
       console.error("[App] failed to submit timesheet", error)
       setToast({
@@ -293,9 +257,16 @@ export function App() {
               entriesLoading={entriesLoading}
               entriesError={entriesError}
               isSubmitting={isSubmitting}
+              isDeletingEntry={isDeletingEntry}
               onRetryEntries={loadWeekData}
-              timesheets={MOCK_TIMESHEETS}
-              timesheetDetails={MOCK_TIMESHEET_DETAILS}
+              timesheets={timesheets}
+              timesheetsLoading={timesheetsLoading}
+              selectedDetail={selectedDetail}
+              selectedDetailOpen={selectedWeekStart !== null}
+              selectedDetailLoading={selectedDetailLoading}
+              selectedDetailError={selectedDetailError}
+              onSelectTimesheet={handleSelectTimesheet}
+              onCloseDetail={handleCloseDetail}
               onEditEntry={handleEditEntry}
               onDeleteEntry={handleDeleteEntry}
               onSubmit={handleSubmit}
