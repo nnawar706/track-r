@@ -51,3 +51,34 @@ export function getByWeekStart(req, res) {
     return res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 }
+
+export function submitTimesheet(req, res) {
+  const { weekStart } = req.params;
+
+  if (!WEEK_START_REGEX.test(weekStart)) {
+    return res.status(400).json({ message: 'Invalid week.' });
+  }
+
+  try {
+    const timesheet = timesheetModel.findByWeekStart(weekStart);
+    const entryCount = timesheet ? timeEntryModel.findByTimesheet(timesheet.id).length : 0;
+
+    if (entryCount === 0) {
+      return res.status(400).json({ message: 'You cannot submit a timesheet with no entries.' });
+    }
+
+    if (timesheet.status === 'submitted') {
+      return res.status(409).json({ message: 'This timesheet has already been submitted.' });
+    }
+
+    const updated = timesheetModel.markSubmitted(weekStart);
+
+    return res.status(200).json({
+      status: updated.status,
+      submittedAt: updated.submitted_at,
+    });
+  } catch (error) {
+    console.error('[timesheetController.submitTimesheet]', error);
+    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+}

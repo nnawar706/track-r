@@ -17,6 +17,7 @@ type HomeProps = {
   entries: TimeEntry[]
   entriesLoading: boolean
   entriesError: string | null
+  isSubmitting: boolean
   onRetryEntries: () => void
   timesheets: Timesheet[]
   timesheetDetails: Record<number, TimesheetDetail>
@@ -34,6 +35,7 @@ export function Home({
   entries,
   entriesLoading,
   entriesError,
+  isSubmitting,
   onRetryEntries,
   timesheets,
   timesheetDetails,
@@ -79,6 +81,7 @@ export function Home({
           status={status}
           entries={entries}
           isLoading={entriesLoading}
+          isSubmitting={isSubmitting}
           onEdit={onEditEntry}
           onDelete={onDeleteEntry}
           onSubmit={onSubmit}

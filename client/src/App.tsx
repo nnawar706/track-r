@@ -10,7 +10,7 @@ import { formatWeekRange } from "@/lib/formatWeekRange"
 import { ApiError } from "@/api/client"
 import { createEntry } from "@/api/entries"
 import { listProjects } from "@/api/projects"
-import { getTimesheetByWeekStart } from "@/api/timesheets"
+import { getTimesheetByWeekStart, submitTimesheet } from "@/api/timesheets"
 import type { Project, TimeEntry, Timesheet, TimesheetDetail, TimesheetStatus } from "@/types"
 
 const weekStart = getWeekStart(new Date())
@@ -151,7 +151,8 @@ export function App() {
   const [lastUsedProjectId, setLastUsedProjectId] = useState<number | null>(null)
   const [newEntryOpen, setNewEntryOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; variant: "info" | "error" } | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -237,7 +238,10 @@ export function App() {
       return
     }
 
-    setToastMessage(`Added to week of ${formatWeekRange(created.weekStart, getWeekEnd(created.weekStart))}`)
+    setToast({
+      message: `Added to week of ${formatWeekRange(created.weekStart, getWeekEnd(created.weekStart))}`,
+      variant: "info",
+    })
   }
 
   function handleDeleteEntry(entryId: number) {
@@ -249,9 +253,21 @@ export function App() {
     setNewEntryOpen(true)
   }
 
-  function handleSubmit() {
-    if (entries.length === 0 || status === "submitted") return
-    setStatus("submitted")
+  async function handleSubmit() {
+    if (entries.length === 0 || status === "submitted" || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await submitTimesheet(weekStart)
+      await loadWeekData()
+    } catch (error) {
+      console.error("[App] failed to submit timesheet", error)
+      setToast({
+        message: error instanceof ApiError ? error.message : "Unable to submit timesheet. Please try again.",
+        variant: "error",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -262,7 +278,7 @@ export function App() {
           setNewEntryOpen(true)
         }}
       />
-      {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+      {toast && <Toast message={toast.message} variant={toast.variant} onDismiss={() => setToast(null)} />}
       <Routes>
         <Route
           path="/"
@@ -276,6 +292,7 @@ export function App() {
               entries={entries}
               entriesLoading={entriesLoading}
               entriesError={entriesError}
+              isSubmitting={isSubmitting}
               onRetryEntries={loadWeekData}
               timesheets={MOCK_TIMESHEETS}
               timesheetDetails={MOCK_TIMESHEET_DETAILS}

@@ -16,3 +16,11 @@ export function getOrCreate(weekStart) {
 
   return db.prepare('SELECT * FROM timesheet WHERE id = ?').get(lastInsertRowid);
 }
+
+export function markSubmitted(weekStart) {
+  db.prepare(
+    `UPDATE timesheet SET status = 'submitted', submitted_at = datetime('now') WHERE week_start = ?`
+  ).run(weekStart);
+
+  return findByWeekStart(weekStart);
+}

@@ -18,6 +18,7 @@ type EntryListProps = {
   status: TimesheetStatus
   entries: TimeEntry[]
   isLoading: boolean
+  isSubmitting: boolean
   onEdit: (entry: TimeEntry) => void
   onDelete: (entryId: number) => void
   onSubmit: () => void
@@ -35,6 +36,7 @@ export function EntryList({
   status,
   entries,
   isLoading,
+  isSubmitting,
   onEdit,
   onDelete,
   onSubmit,
@@ -125,8 +127,8 @@ export function EntryList({
         )}
 
         <div className="flex justify-end border-t border-border pt-4">
-          <Button onClick={onSubmit} disabled={isSubmitted || isEmpty || isLoading}>
-            {isSubmitted ? "Submitted" : "Submit Timesheet"}
+          <Button onClick={onSubmit} disabled={isSubmitted || isEmpty || isLoading || isSubmitting}>
+            {isSubmitting ? "Submitting..." : isSubmitted ? "Submitted" : "Submit Timesheet"}
           </Button>
         </div>
       </CardContent>

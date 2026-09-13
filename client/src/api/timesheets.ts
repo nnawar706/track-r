@@ -13,3 +13,14 @@ export type WeekTimesheet = {
 export function getTimesheetByWeekStart(weekStart: string): Promise<WeekTimesheet> {
   return apiRequest<WeekTimesheet>(`/timesheets/${weekStart}`)
 }
+
+type SubmitTimesheetResponse = {
+  status: TimesheetStatus
+  submittedAt: string
+}
+
+export function submitTimesheet(weekStart: string): Promise<SubmitTimesheetResponse> {
+  return apiRequest<SubmitTimesheetResponse>(`/timesheets/${weekStart}/submit`, {
+    method: "POST",
+  })
+}
